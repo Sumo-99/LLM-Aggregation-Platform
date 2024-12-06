@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app.routes import test
 from app.routes import signup
+from app.routes import login
 
 app = FastAPI()
 
@@ -11,3 +12,4 @@ def read_root():
 # Include routes
 app.include_router(test.router)
 app.include_router(signup.router)
+app.include_router(login.router)
