@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from app.routes import test
 from app.routes import gemini
-from app.routes import chat_socket
 
 app = FastAPI()
 
@@ -12,4 +11,3 @@ def read_root():
 # Include routes
 app.include_router(test.router)
 app.include_router(gemini.router)
-app.include_router(chat_socket.router)
