@@ -20,8 +20,8 @@ aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
 dynamodb = boto3.resource(
     'dynamodb',
     region_name='us-east-1',  # Replace with your region
-    aws_access_key_id=aws_access_key_id,  # Replace with your access key ID
-    aws_secret_access_key=aws_secret_access_key  # Replace with your secret key
+    aws_access_key_id="aws_access_key_id" ,  # Replace with your access key ID
+    aws_secret_access_key="aws_secret_access_key"  # Replace with your secret key
 )
 
 # Reference to the DynamoDB table
