@@ -1,4 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
-class PromptRequest(BaseModel):
-    prompt: str
+# Pydantic model for request validation
+class SignupRequest(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
