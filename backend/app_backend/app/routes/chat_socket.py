@@ -46,7 +46,7 @@ def create_redis_client():
         "ssh",
         "-i", "/Users/sumanthramesh/Documents/dev/cloud/jumper.pem",  # Path to your SSH key
         "-o", "StrictHostKeyChecking=no",
-        "-L", "127.0.0.1:6379:127.0.0.1:6379",
+        "-L", "127.0.0.1:6380:127.0.0.1:6379",
         "ec2-user@3.230.206.206",
         "-N"
     ]
@@ -119,9 +119,7 @@ async def start_session(request: WebSocketRequest):
         "user_id": request.user_id,
         "session_id": request.session_id,
         "model_ids": request.model_ids,
-        "all_model_data": [],
-        "prompt": request.prompt,
-        "prompt_timestamp": timestamp
+        "all_model_data": []
     }
     # model = model_table.query(
     #     KeyConditionExpression=Key('model_id').eq(model_id)  # Query using the partition key
@@ -160,11 +158,21 @@ async def websocket_endpoint(websocket: WebSocket, ws_session_id: str):
 
     # Connect the WebSocket
     await manager.connect(ws_session_id, websocket)
-
-    print("Session Details: ", session_store[ws_session_id]["model_ids"], session_store[ws_session_id]["prompt"], session_store[ws_session_id]["prompt_timestamp"])
     all_model_data = session_store[ws_session_id]["all_model_data"]
+    try:
+        # Process incoming messages
+        asyncio.create_task(listen_to_redis(ws_session_id, websocket))
+        while True:
+            message = await websocket.receive_text()
+            print(f"WebSocket message received: {message}")
+            process_prompt(message, all_model_data, ws_session_id)
+    except WebSocketDisconnect:
+        manager.disconnect(ws_session_id)
+        print(f"WebSocket disconnected for session {ws_session_id}")
+
+def process_prompt(message, all_model_data, ws_session_id):
     # send request to each model pod
-    base_url = f"http://127.0.0.1:8000/"
+    base_url = f"http://127.0.0.1:8080/"
     for model_dict in all_model_data:
         print("Triggering model: ", model_dict["model_name"])
         model_api_endpoint = settings.MODEL_API_MAP[model_dict["model_name"]]
@@ -175,35 +183,39 @@ async def websocket_endpoint(websocket: WebSocket, ws_session_id: str):
             "user_id": session_store[ws_session_id]["user_id"],
             "session_id": session_store[ws_session_id]["session_id"],
             "model_id": model_dict["model_id"],
-            "prompt": session_store[ws_session_id]["prompt"]
+            "prompt": message
         }
         print("Payload: ", payload)
         response = requests.request("POST", url=f"{base_url}/{model_api_endpoint}", data=json.dumps(payload), headers=headers)
         print("model trigger response: ", response.text)
 
-    try:
-        # Start listening to Redis for updates asynchronously
-        await listen_to_redis(ws_session_id, websocket)
-    except WebSocketDisconnect:
-        manager.disconnect(ws_session_id)
-        print(f"WebSocket disconnected for session {ws_session_id}")
+def create_pubsub_client():
+    return redis.StrictRedis(host="127.0.0.1", port=6379, decode_responses=True)
+
+# Use this new client in listen_to_redis
+pubsub_client = create_pubsub_client()
 
 async def listen_to_redis(session_id: str, websocket: WebSocket):
     """Subscribe to Redis updates and send them to the WebSocket client asynchronously."""
-    pubsub = redis_client.pubsub()
-    pubsub.subscribe(session_id)
-
+    pubsub = pubsub_client.pubsub()
     try:
+        pubsub.subscribe(session_id)
+        print(f"Subscribed to Redis channel: {session_id}")
         while True:
-            message = pubsub.get_message(timeout=1.0)  # Non-blocking check for new messages
-            if message and message["type"] == "message":
-                data = message["data"]
-                print(f"Received message: {data}")
-                await manager.send_message(session_id, data)
-
-            # Yield control to the event loop to handle other tasks
-            await asyncio.sleep(0.1)
+            # Check for new messages
+            message = pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            if message:
+                print(f"Redis message received: {message}")
+                if message["type"] == "message":
+                    data = message["data"]
+                    print(f"Publishing to WebSocket: {data}")
+                    await manager.send_message(session_id, data)
+            else:
+                print("No message received, continuing to wait...")
+            await asyncio.sleep(0.1)  # Yield control to the event loop
     except Exception as e:
         print(f"Error while listening to Redis: {e}")
     finally:
+        print(f"Unsubscribing from Redis channel: {session_id}")
         pubsub.unsubscribe(session_id)
+        pubsub.close()

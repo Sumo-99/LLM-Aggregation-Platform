@@ -19,7 +19,7 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 # Bastion host details
 BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
 BASTION_USER = "ec2-user"
-BASTION_KEY_PATH = "~/.ssh/jumper.pem"  # Path to the SSH private key
+BASTION_KEY_PATH = "/Users/sumanthramesh/Documents/dev/cloud/jumper.pem"  # Path to the SSH private key
 
 # Configure Redis
 REDIS_HOST = "127.0.0.1"  # Localhost, forwarded by the SSH tunnel
@@ -29,7 +29,7 @@ def create_redis_client():
     # Set up SSH tunnel (one-time setup)
     ssh_command = [
         "ssh",
-        "-i", "~/.ssh/jumper.pem",  # Path to your SSH key
+        "-i", BASTION_KEY_PATH,  # Path to your SSH key
         "-o", "StrictHostKeyChecking=no",
         "-L", "127.0.0.1:6379:127.0.0.1:6379",
         "ec2-user@3.230.206.206",
