@@ -1,92 +1,4 @@
 /* General Layout Styles */
-/*body, html {
-  margin: 0;
-  padding: 0;
-  font-family: Arial, sans-serif;
-  height: 100%;
-}
-
-.main-layout {
-  padding: 20px;
-  background-color: #f4f4f4;
-}
-
-.history {
-  width: 25%;
-  float: left;
-  padding: 10px;
-  background-color: #fafafa;
-}
-
-.history ul {
-  list-style-type: none;
-  padding: 0;
-}
-
-.history li {
-  margin: 10px 0;
-}
-
-.content {
-  width: 70%;
-  float: right;
-  padding: 10px;
-  background-color: #fff;
-}
-
-.search-bar {
-  margin-bottom: 20px;
-}
-
-.search-bar input {
-  width: 100%;
-  padding: 10px;
-  font-size: 16px;
-}
-
-.model-selector {
-  margin-bottom: 20px;
-}
-
-.model-selector label {
-  display: block;
-  margin: 5px 0;
-}
-
-.models {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.model-box {
-  width: 48%;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  max-height: 500px;
-  overflow-y: scroll;
-}
-
-.message-list {
-  margin-top: 30px;
-}
-
-button {
-  padding: 10px 20px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #0056b3;
-}*/
-
-/* General Layout Styles */
 body, html {
   margin: 0;
   padding: 0;
@@ -94,12 +6,13 @@ body, html {
   height: 100%;
 }
 
-.container {
+.main-layout {
   display: flex;
   flex-direction: column;
   height: 100vh;
 }
 
+/* Header Section */
 .header {
   text-align: center;
   padding: 10px 0;
@@ -132,87 +45,100 @@ body, html {
   margin-top: 0;
 }
 
-.history ul {
-  list-style-type: none;
-  padding: 0;
-}
-
-.history li {
-  margin: 10px 0;
-  cursor: pointer;
-  color: #0073e6;
-}
-
-.history li:hover {
-  text-decoration: underline;
-}
-
-/* Content Area */
-.content {
+/* Chat Section */
+.chat {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   padding: 10px;
+  background-color: #fff;
 }
 
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+}
+
+.message {
+  margin: 5px 0;
+  padding: 8px;
+  border-radius: 5px;
+}
+
+.user-message {
+  text-align: right;
+  color: #007bff;
+  background-color: #e6f7ff;
+}
+
+.backend-message {
+  text-align: left;
+  color: #28a745;
+  background-color: #e9f9e9;
+}
+
+/* Input Section */
 .search-bar {
-  margin-bottom: 20px;
-  text-align: center;
+  display: flex;
+  gap: 10px;
 }
 
 .search-bar input {
+  flex: 1;
   padding: 10px;
-  width: 90%;
   font-size: 16px;
   border: 1px solid #ccc;
   border-radius: 5px;
 }
 
+.search-bar button {
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.search-bar button:hover {
+  background-color: #0056b3;
+}
+
+/* Model Selector Section */
 .model-selector {
-  margin-bottom: 20px;
-  text-align: center;
+  width: 20%;
+  border-left: 1px solid #ccc;
+  padding: 10px;
+  background-color: #f4f4f4;
+}
+
+.model-selector h4 {
+  margin-top: 0;
 }
 
 .model-selector label {
-  margin-right: 10px;
+  display: block;
+  margin: 5px 0;
   font-size: 14px;
 }
 
-/* Model Boxes Layout */
-.models {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(48%, 1fr));
-  gap: 20px;
-}
-
-.model-box {
-  border: 1px solid #ccc;
-  border-radius: 5px;
+.model-selector button {
+  display: block;
+  margin-top: 20px;
   padding: 10px;
-  max-height: 500px;
-  overflow-y: scroll;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  background-color: white;
+  width: 100%;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
 }
 
-.model-box h4 {
-  margin-top: 0;
-  font-size: 18px;
+.model-selector button:hover {
+  background-color: #0056b3;
 }
-
-.model-box p {
-  margin: 0;
-}
-
-/* Scrollbar Customization */
-.model-box::-webkit-scrollbar {
-  width: 8px;
-}
-
-.model-box::-webkit-scrollbar-thumb {
-  background-color: #888;
-  border-radius: 4px;
-}
-
-.model-box::-webkit-scrollbar-thumb:hover {
-  background-color: #555;
-}
-
