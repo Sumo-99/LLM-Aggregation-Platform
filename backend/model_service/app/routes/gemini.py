@@ -77,7 +77,7 @@ async def generate_text(request: PromptRequest, ws_session_id: str, tasks: Backg
         response_timestamp = datetime.now().isoformat()
 
         # TODO:
-        session_id = ws_session_id
+        ws_session_id = ws_session_id
         # redis_key = f"{session_id}_model"
         redis_key = f"{user_id}_{sess_id}_{model_id}"
 
@@ -85,32 +85,17 @@ async def generate_text(request: PromptRequest, ws_session_id: str, tasks: Backg
             "prompt": prompt,
             "response": response_text,
             "prompt_timestamp": prompt_timestamp,
-            "response_timestamp": response_timestamp
+            "response_timestamp": response_timestamp,
+            "model_id": model_id
         }
 
         try:
-            # Perform basic Redis operations
-            # redis_client.set("test_key", "test_value")
-            # value = redis_client.get("test_key")
-            # # redis_client.rpush("test_list", "item1", "item2", "item3")
-            # list_items = redis_client.lrange("test_list", 0, -1)
-            
             redis_client.rpush(redis_key, json.dumps(new_entry))
-
-            # redis_client.set(redis_key, response.text)
-            # redis_client.rpush(redis_key, json.dumps(new_entry))
-            # Publish to the specific Redis channel
-            # redis_client.publish(session_id, response.text)
-
-            redis_client.publish(session_id, json.dumps(new_entry))
-            # return {
-            #     "test_key_value": value,
-            #     "test_list_items": list_items,
-            #     "generated_text": response.text
-            # }
+            redis_client.publish(ws_session_id, json.dumps(new_entry))
+            
             return {
                 "redis_key": redis_key,
-                "published_channel": session_id,
+                "published_channel": ws_session_id,
                 # "generated_text": response.text
                 "data_stored": new_entry
             }
