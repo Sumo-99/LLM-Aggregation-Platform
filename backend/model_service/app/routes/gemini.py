@@ -1,8 +1,10 @@
+import json
 import os
 import google.generativeai as genai
 import subprocess
 import redis
-
+import time
+from datetime import datetime
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi import APIRouter
 from redis import Redis, ConnectionError
@@ -17,7 +19,7 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 # Bastion host details
 BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
 BASTION_USER = "ec2-user"
-BASTION_KEY_PATH = "/Users/sumanthramesh/Documents/dev/cloud/jumper.pem"  # Path to the SSH private key
+BASTION_KEY_PATH = "~/.ssh/jumper.pem"  # Path to the SSH private key
 
 # Configure Redis
 REDIS_HOST = "127.0.0.1"  # Localhost, forwarded by the SSH tunnel
@@ -27,7 +29,7 @@ def create_redis_client():
     # Set up SSH tunnel (one-time setup)
     ssh_command = [
         "ssh",
-        "-i", "/Users/sumanthramesh/Documents/dev/cloud/jumper.pem",  # Path to your SSH key
+        "-i", "~/.ssh/jumper.pem",  # Path to your SSH key
         "-o", "StrictHostKeyChecking=no",
         "-L", "127.0.0.1:6379:127.0.0.1:6379",
         "ec2-user@3.230.206.206",
@@ -63,23 +65,53 @@ async def generate_text(request: PromptRequest, tasks: BackgroundTasks):
     try:
         # Select the desired model
         model = genai.GenerativeModel('gemini-1.5-flash')
-        # Generate content based on the prompt
-        response = model.generate_content(request.prompt)
         
+        user_id = request.user_id
+        sess_id = request.session_id
+        model_id = request.model_id
+        prompt = request.prompt
+        prompt_timestamp = datetime.now().isoformat()
+        response = model.generate_content(request.prompt)
+        response_text = response.text.strip()
+        response_timestamp = datetime.now().isoformat()
+
         # TODO:
-        session_id = '123'
+        session_id = "test-session-123"
+        # redis_key = f"{session_id}_model"
+        redis_key = f"{user_id}_{sess_id}_{model_id}"
+
+        new_entry = {
+            "prompt": prompt,
+            "response": response_text,
+            "prompt_timestamp": prompt_timestamp,
+            "response_timestamp": response_timestamp
+        }
 
         try:
             # Perform basic Redis operations
-            redis_client.set("test_key", "test_value")
-            value = redis_client.get("test_key")
-            redis_client.rpush("test_list", "item1", "item2", "item3")
-            list_items = redis_client.lrange("test_list", 0, -1)
+            # redis_client.set("test_key", "test_value")
+            # value = redis_client.get("test_key")
+            # # redis_client.rpush("test_list", "item1", "item2", "item3")
+            # list_items = redis_client.lrange("test_list", 0, -1)
+            
+            redis_client.rpush(redis_key, json.dumps(new_entry))
 
+            # redis_client.set(redis_key, response.text)
+            # redis_client.rpush(redis_key, json.dumps(new_entry))
+            # Publish to the specific Redis channel
+            # redis_client.publish(session_id, response.text)
+
+            redis_client.publish(session_id, json.dumps(new_entry))
+            # return {
+            #     "test_key_value": value,
+            #     "test_list_items": list_items,
+            #     "generated_text": response.text
+            # }
             return {
-                "test_key_value": value,
-                "test_list_items": list_items,
-                "generated_text": response.text
+                "redis_key": redis_key,
+                "published_channel": session_id,
+                # "generated_text": response.text
+                "data_stored": new_entry
             }
         except Exception as e:
             return {"error": str(e)}, 500
