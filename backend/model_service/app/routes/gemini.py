@@ -60,9 +60,10 @@ def redis_ping():
 
 redis_ping()
 
-@router.post("/chat_gemini")
-async def generate_text(request: PromptRequest, tasks: BackgroundTasks):
+@router.post("/chat_gemini/{ws_session_id}")
+async def generate_text(request: PromptRequest, ws_session_id: str, tasks: BackgroundTasks):
     try:
+        print("Ws Session ID: ",ws_session_id)
         # Select the desired model
         model = genai.GenerativeModel('gemini-1.5-flash')
         
@@ -76,7 +77,7 @@ async def generate_text(request: PromptRequest, tasks: BackgroundTasks):
         response_timestamp = datetime.now().isoformat()
 
         # TODO:
-        session_id = "test-session-123"
+        session_id = ws_session_id
         # redis_key = f"{session_id}_model"
         redis_key = f"{user_id}_{sess_id}_{model_id}"
 

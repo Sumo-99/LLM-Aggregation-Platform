@@ -8,6 +8,8 @@ from app.routes import login
 from app.routes import model_fetch
 from app.routes import chat_socket
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.routes.chat_socket import router as chat_socket_router
 
 # Redis connection and SSH tunneling configuration
@@ -69,6 +71,15 @@ async def close_ssh_tunnel():
         print("SSH tunnel closed.")
 
 app = FastAPI()
+
+#CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://myfrontend.com"],  # Add your frontends here
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 @app.get("/")
 def read_root():

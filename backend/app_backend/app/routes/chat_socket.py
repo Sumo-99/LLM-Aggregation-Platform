@@ -7,6 +7,7 @@ import os
 import requests
 import json
 import httpx
+import uuid
 from redis import Redis, ConnectionError
 from boto3.dynamodb.conditions import Key, Attr
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
@@ -117,11 +118,12 @@ manager = WebSocketManager()
 async def start_session(request: WebSocketRequest):
     """Handles the initial HTTP request for starting a WebSocket session."""
     timestamp = datetime.datetime.now().isoformat()
-
+    ws_session_id = "ws-" + request.session_id
     # Store session data in memory
-    session_store[request.session_id] = {
+    session_store[ws_session_id] = {
         "user_id": request.user_id,
         "session_id": request.session_id,
+        "ws_session_id": ws_session_id,
         "model_ids": request.model_ids,
         "all_model_data": []
     }
@@ -138,7 +140,7 @@ async def start_session(request: WebSocketRequest):
         if "Items" in response and response["Items"]:
             # Extract the model_name field
             model_name = response["Items"][0].get("model_name")
-            session_store[request.session_id]["all_model_data"].append({
+            session_store[ws_session_id]["all_model_data"].append({
                 "model_id": model_id,
                 "model_name": model_name
             })
@@ -149,12 +151,13 @@ async def start_session(request: WebSocketRequest):
     return {
         "message": "WebSocket session initialization received.",
         "timestamp": timestamp,
-        "ws_session_id": request.session_id
+        "ws_session_id": ws_session_id
     }
 
 @router.websocket("/ws/{ws_session_id}")
 async def websocket_endpoint(websocket: WebSocket, ws_session_id: str):
     """WebSocket endpoint to handle the connection."""
+    print("SEssion store --->", session_store)
     # Check if session exists
     if ws_session_id not in session_store:
         await websocket.close(code=4000, reason="Invalid session ID")
@@ -178,6 +181,7 @@ async def process_prompt(message, all_model_data, ws_session_id):
     """Trigger requests to model pods asynchronously."""
     base_url = f"http://127.0.0.1:8080/"
     for model_dict in all_model_data:
+        print("Model Dict: ", model_dict)
         model_api_endpoint = settings.MODEL_API_MAP[model_dict["model_name"]]
         headers = {'Content-Type': 'application/json'}
         payload = {
@@ -186,12 +190,12 @@ async def process_prompt(message, all_model_data, ws_session_id):
             "model_id": model_dict["model_id"],
             "prompt": message
         }
-        asyncio.create_task(send_request(base_url, model_api_endpoint, payload, headers))
+        asyncio.create_task(send_request(base_url, model_api_endpoint, payload, headers, ws_session_id))
 
-async def send_request(base_url, model_api_endpoint, payload, headers):
+async def send_request(base_url, model_api_endpoint, payload, headers, ws_session_id):
     """Send asynchronous HTTP request using the shared client."""
     try:
-        response = await http_client.post(f"{base_url}{model_api_endpoint}", json=payload, headers=headers)
+        response = await http_client.post(f"{base_url}{model_api_endpoint}/{ws_session_id}", json=payload, headers=headers)
         print(f"Model trigger response: {response.text}")
     except Exception as e:
         print(f"Error triggering model: {e}")
