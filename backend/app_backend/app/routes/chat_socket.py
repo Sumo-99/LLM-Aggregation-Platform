@@ -1,18 +1,88 @@
 import datetime
+import redis
+import subprocess
+import asyncio
+import boto3
+import os
+import requests
+import json
+from redis import Redis, ConnectionError
+from boto3.dynamodb.conditions import Key, Attr
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict
+from app.config import settings
 
 # Initialize APIRouter
 router = APIRouter()
 
-# Temporary in-memory storage for session data (this can be replaced with a database)
+# DynamoDB setup
+aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
+aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
+region_name = 'us-east-1'  # Replace with your region
+
+dynamodb = boto3.resource(
+    'dynamodb',
+    region_name=region_name,
+    aws_access_key_id=aws_access_key_id,
+    aws_secret_access_key=aws_secret_access_key
+)
+
+# Reference the DynamoDB tables
+model_table = dynamodb.Table('model')
+
+# Bastion host details
+BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
+BASTION_USER = "ec2-user"
+BASTION_KEY_PATH = "/Users/sumanthramesh/Documents/dev/cloud/jumper.pem"  # Path to the SSH private key
+
+# Configure Redis
+REDIS_HOST = "127.0.0.1"  # Localhost, forwarded by the SSH tunnel
+REDIS_PORT = 6379
+
+def create_redis_client():
+    # Set up SSH tunnel (one-time setup)
+    ssh_command = [
+        "ssh",
+        "-i", "/Users/sumanthramesh/Documents/dev/cloud/jumper.pem",  # Path to your SSH key
+        "-o", "StrictHostKeyChecking=no",
+        "-L", "127.0.0.1:6379:127.0.0.1:6379",
+        "ec2-user@3.230.206.206",
+        "-N"
+    ]
+
+    try:
+        subprocess.Popen(ssh_command)  # Start the SSH tunnel in the background
+    except Exception as e:
+        print(f"Error starting SSH tunnel: {e}")
+        raise
+
+    # Connect to Redis through the tunnel
+    return redis.StrictRedis(host="127.0.0.1", port=6379, decode_responses=True)
+
+# Initialize Redis client
+redis_client = create_redis_client()
+
+def redis_ping():
+    try:
+        # Test Redis connection
+        if redis_client.ping():
+            return {"message": "Redis connection successful!"}
+        else:
+            return {"error": "Redis connection failed!"}, 500
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+redis_ping()
+
+# Temporary in-memory storage for session data
 session_store: Dict[str, Dict] = {}
 
 class WebSocketRequest(BaseModel):
     model_ids: List[str]
     prompt: str
     session_id: str
+    user_id: str
 
 # In-memory store for active WebSocket connections
 class WebSocketManager:
@@ -42,53 +112,98 @@ manager = WebSocketManager()
 @router.post("/start-session")
 async def start_session(request: WebSocketRequest):
     """Handles the initial HTTP request for starting a WebSocket session."""
-    # Generate a timestamp when the request is received
     timestamp = datetime.datetime.now().isoformat()
 
     # Store session data in memory
     session_store[request.session_id] = {
+        "user_id": request.user_id,
+        "session_id": request.session_id,
         "model_ids": request.model_ids,
+        "all_model_data": [],
         "prompt": request.prompt,
-        "timestamp": timestamp
+        "prompt_timestamp": timestamp
     }
+    # model = model_table.query(
+    #     KeyConditionExpression=Key('model_id').eq(model_id)  # Query using the partition key
+    # )
+    for model_id in request.model_ids:
+        # Query the table for the model
+        response = model_table.query(
+            KeyConditionExpression=Key('model_id').eq(model_id)  # Use query since model_id is the partition key
+        )
+        
+        # Check if the response contains items
+        if "Items" in response and response["Items"]:
+            # Extract the model_name field
+            model_name = response["Items"][0].get("model_name")
+            session_store[request.session_id]["all_model_data"].append({
+                "model_id": model_id,
+                "model_name": model_name
+            })
+            print(f"Model Name for {model_id}: {model_name}")
+        else:
+            print(f"Model not found for {model_id}")
 
     return {
         "message": "WebSocket session initialization received.",
         "timestamp": timestamp,
-        "session_id": request.session_id
+        "ws_session_id": request.session_id
     }
 
-@router.websocket("/ws/{session_id}")
-async def websocket_endpoint(websocket: WebSocket, session_id: str):
+@router.websocket("/ws/{ws_session_id}")
+async def websocket_endpoint(websocket: WebSocket, ws_session_id: str):
     """WebSocket endpoint to handle the connection."""
     # Check if session exists
-    if session_id not in session_store:
+    if ws_session_id not in session_store:
         await websocket.close(code=4000, reason="Invalid session ID")
         return
 
-    # Retrieve session data
-    session_data = session_store[session_id]
-    model_ids = session_data["model_ids"]
-    prompt = session_data["prompt"]
-
     # Connect the WebSocket
-    await manager.connect(session_id, websocket)
+    await manager.connect(ws_session_id, websocket)
+
+    print("Session Details: ", session_store[ws_session_id]["model_ids"], session_store[ws_session_id]["prompt"], session_store[ws_session_id]["prompt_timestamp"])
+    all_model_data = session_store[ws_session_id]["all_model_data"]
+    # send request to each model pod
+    base_url = f"http://127.0.0.1:8000/"
+    for model_dict in all_model_data:
+        print("Triggering model: ", model_dict["model_name"])
+        model_api_endpoint = settings.MODEL_API_MAP[model_dict["model_name"]]
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        payload = {
+            "user_id": session_store[ws_session_id]["user_id"],
+            "session_id": session_store[ws_session_id]["session_id"],
+            "model_id": model_dict["model_id"],
+            "prompt": session_store[ws_session_id]["prompt"]
+        }
+        print("Payload: ", payload)
+        response = requests.request("POST", url=f"{base_url}/{model_api_endpoint}", data=json.dumps(payload), headers=headers)
+        print("model trigger response: ", response.text)
+
     try:
-        # Log the session data
-        print(f"Session {session_id} started with model_ids: {model_ids}, prompt: '{prompt}'")
-
-        # Handle incoming messages from the client
-        while True:
-            data = await websocket.receive_text()
-            response = f"Received: {data} | Model IDs: {model_ids} | Prompt: {prompt}"
-
-            # trigger EKS with the prompt
-
-            # Check redis for result
-
-            # send result as response
-
-            await manager.send_message(session_id, response)
+        # Start listening to Redis for updates asynchronously
+        await listen_to_redis(ws_session_id, websocket)
     except WebSocketDisconnect:
-        manager.disconnect(session_id)
-        print(f"WebSocket disconnected for session {session_id}")
+        manager.disconnect(ws_session_id)
+        print(f"WebSocket disconnected for session {ws_session_id}")
+
+async def listen_to_redis(session_id: str, websocket: WebSocket):
+    """Subscribe to Redis updates and send them to the WebSocket client asynchronously."""
+    pubsub = redis_client.pubsub()
+    pubsub.subscribe(session_id)
+
+    try:
+        while True:
+            message = pubsub.get_message(timeout=1.0)  # Non-blocking check for new messages
+            if message and message["type"] == "message":
+                data = message["data"]
+                print(f"Received message: {data}")
+                await manager.send_message(session_id, data)
+
+            # Yield control to the event loop to handle other tasks
+            await asyncio.sleep(0.1)
+    except Exception as e:
+        print(f"Error while listening to Redis: {e}")
+    finally:
+        pubsub.unsubscribe(session_id)
