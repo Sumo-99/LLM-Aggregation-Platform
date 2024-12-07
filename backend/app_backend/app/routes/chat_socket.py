@@ -6,6 +6,7 @@ import boto3
 import os
 import requests
 import json
+import httpx
 from redis import Redis, ConnectionError
 from boto3.dynamodb.conditions import Key, Attr
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
@@ -30,6 +31,9 @@ dynamodb = boto3.resource(
 
 # Reference the DynamoDB tables
 model_table = dynamodb.Table('model')
+
+# Http Client
+http_client = httpx.AsyncClient()
 
 # Bastion host details
 BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
@@ -165,29 +169,32 @@ async def websocket_endpoint(websocket: WebSocket, ws_session_id: str):
         while True:
             message = await websocket.receive_text()
             print(f"WebSocket message received: {message}")
-            process_prompt(message, all_model_data, ws_session_id)
+            asyncio.create_task(process_prompt(message, all_model_data, ws_session_id))
     except WebSocketDisconnect:
         manager.disconnect(ws_session_id)
         print(f"WebSocket disconnected for session {ws_session_id}")
 
-def process_prompt(message, all_model_data, ws_session_id):
-    # send request to each model pod
+async def process_prompt(message, all_model_data, ws_session_id):
+    """Trigger requests to model pods asynchronously."""
     base_url = f"http://127.0.0.1:8080/"
     for model_dict in all_model_data:
-        print("Triggering model: ", model_dict["model_name"])
         model_api_endpoint = settings.MODEL_API_MAP[model_dict["model_name"]]
-        headers = {
-            'Content-Type': 'application/json'
-        }
+        headers = {'Content-Type': 'application/json'}
         payload = {
             "user_id": session_store[ws_session_id]["user_id"],
             "session_id": session_store[ws_session_id]["session_id"],
             "model_id": model_dict["model_id"],
             "prompt": message
         }
-        print("Payload: ", payload)
-        response = requests.request("POST", url=f"{base_url}/{model_api_endpoint}", data=json.dumps(payload), headers=headers)
-        print("model trigger response: ", response.text)
+        asyncio.create_task(send_request(base_url, model_api_endpoint, payload, headers))
+
+async def send_request(base_url, model_api_endpoint, payload, headers):
+    """Send asynchronous HTTP request using the shared client."""
+    try:
+        response = await http_client.post(f"{base_url}{model_api_endpoint}", json=payload, headers=headers)
+        print(f"Model trigger response: {response.text}")
+    except Exception as e:
+        print(f"Error triggering model: {e}")
 
 def create_pubsub_client():
     return redis.StrictRedis(host="127.0.0.1", port=6379, decode_responses=True)
