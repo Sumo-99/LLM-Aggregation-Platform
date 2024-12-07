@@ -1,149 +1,19 @@
-// import React, { useState } from 'react';
-// import { useWebSocket } from '../services/WebSocketContext';
-
-// // Component for rendering each history item
-// const HistoryItem = ({ item, index }) => {
-//   const [isExpanded, setIsExpanded] = useState(false);
-
-//   return (
-//     <li
-//       key={index}
-//       style={{ marginBottom: '10px', cursor: 'pointer' }}
-//       onClick={() => setIsExpanded(!isExpanded)}
-//     >
-//       <strong>{item.sender === 'You' ? 'You' : 'Backend'}:</strong> {item.sender === 'You' ? item.content.prompt : item.content.reply}
-//       {isExpanded && (
-//         <div style={{ marginTop: '5px', fontSize: '0.9em', color: '#555' }}>
-//           <pre>{JSON.stringify(item.content, null, 2)}</pre>
-//         </div>
-//       )}
-//     </li>
-//   );
-// };
-
-// // MainLayout component
-// const MainLayout = () => {
-//   const { wsClient, isConnected } = useWebSocket(); // Assuming WebSocket context is imported
-//   const [selectedModels, setSelectedModels] = useState({
-//     model1: false,
-//     model2: false,
-//     model3: false,
-//     model4: false,
-//   });
-//   const [messages, setMessages] = useState([]);
-//   const [inputMessage, setInputMessage] = useState('');
-
-//   const sendMessage = () => {
-//     const activeModels = Object.keys(selectedModels).filter((model) => selectedModels[model]);
-
-//     if (!inputMessage.trim()) {
-//       console.error('Input message is empty');
-//       return;
-//     }
-
-//     if (activeModels.length === 0) {
-//       console.error('No models selected');
-//       return;
-//     }
-
-//     if (isConnected && wsClient) {
-//       const messagePayload = {
-//         user_id: 'USER123',
-//         session_id: 'SESSION456',
-//         prompt: inputMessage,
-//         models: activeModels,
-//       };
-
-//       console.log('Sending message:', messagePayload);
-//       wsClient.sendMessage(messagePayload);
-//       setMessages((prev) => [...prev, { sender: 'You', content: messagePayload }]);
-//       setInputMessage('');
-//     } else {
-//       console.error('WebSocket is not connected');
-//     }
-//   };
-
-//   return (
-//     <div className="main-layout">
-//       <h1>Multi-LLM Platform</h1>
-
-//       {/* History Section */}
-//       <div className="history">
-//         <h4>History</h4>
-//         <ul style={{ listStyle: 'none', padding: '0' }}>
-//           {messages.map((msg, index) => (
-//             <HistoryItem key={index} item={msg} />
-//           ))}
-//         </ul>
-//       </div>
-
-//       {/* Rest of the UI */}
-//       <div className="content">
-//         <div className="search-bar">
-//           <input
-//             type="text"
-//             value={inputMessage}
-//             onChange={(e) => setInputMessage(e.target.value)}
-//             placeholder="Enter your prompt..."
-//           />
-//           <button onClick={sendMessage}>Send</button>
-//         </div>
-
-//         <div className="model-selector">
-//           {Object.keys(selectedModels).map((model) => (
-//             <label key={model}>
-//               <input
-//                 type="checkbox"
-//                 checked={selectedModels[model]}
-//                 onChange={() => setSelectedModels((prev) => ({ ...prev, [model]: !prev[model] }))}
-//               />
-//               {model.toUpperCase()}
-//             </label>
-//           ))}
-//         </div>
-
-//         <div className="models">
-//           {Object.keys(selectedModels).map(
-//             (model) =>
-//               selectedModels[model] && (
-//                 <div key={model} className="model-box">
-//                   <h4>{model.toUpperCase()}</h4>
-//                   <p>Output will appear here...</p>
-//                 </div>
-//               )
-//           )}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-
-// export default MainLayout;
-
-
-
 import React, { useState, useEffect } from 'react';
 import { useWebSocket } from '../services/WebSocketContext';
+import axios from 'axios'; // For REST API requests
 import './MainLayout.css';
 
 const MainLayout = () => {
-  const { wsClient, isConnected } = useWebSocket(); // Use connection state
+  const { wsClient, isConnected, updateWebSocketUrl } = useWebSocket(); // Added `updateWebSocketUrl`
   const [selectedModels, setSelectedModels] = useState({
-    model1: false,
+    "123": false,
     model2: false,
     model3: false,
     model4: false,
   });
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
-
-  const handleCheckboxChange = (model) => {
-    setSelectedModels((prevState) => ({
-      ...prevState,
-      [model]: !prevState[model],
-    }));
-  };
+  const [sessionId, setSessionId] = useState(null); // Track session ID
 
   useEffect(() => {
     if (wsClient && isConnected) {
@@ -155,27 +25,59 @@ const MainLayout = () => {
     }
   }, [wsClient, isConnected]);
 
-  const sendMessage = () => {
+  const handleCheckboxChange = (model) => {
+    setSelectedModels((prevState) => ({
+      ...prevState,
+      [model]: !prevState[model],
+    }));
+  };
+
+  const handleStartSession = async () => {
     const activeModels = Object.keys(selectedModels).filter(
       (model) => selectedModels[model]
     );
-
-    if (!inputMessage.trim()) {
-      console.error('Input message is empty');
-      return;
-    }
 
     if (activeModels.length === 0) {
       console.error('No models selected');
       return;
     }
 
+    try {
+      const sessionData = {
+        model_ids: activeModels,
+        prompt: 'Initial Prompt',
+        session_id: `session-${Date.now()}`, // Generate unique session ID
+        user_id: 'USER123', // Replace with actual user ID if available
+      };
+
+      const response = await axios.post('http://127.0.0.1:8000/start-session', sessionData);
+      console.log('Session started:', response.data);
+
+      setSessionId(response.data.ws_session_id); // Store session ID
+      console.log("Making requerst to ", `ws://127.0.0.1:8000/ws/${response.data.ws_session_id}`);
+      updateWebSocketUrl(`ws://127.0.0.1:8000/ws/${response.data.ws_session_id}`); // Update WebSocket URL
+    } catch (error) {
+      console.error('Error starting session:', error);
+    }
+  };
+
+  const sendMessage = () => {
+    if (!sessionId) {
+      console.error('No active session. Start a session first.');
+      return;
+    }
+
+    if (!inputMessage.trim()) {
+      console.error('Input message is empty');
+      return;
+    }
+
     if (isConnected && wsClient) {
       const messagePayload = {
-        user_id: 'USER123', // Placeholder for now
-        session_id: 'SESSION456', // Placeholder for now
+        user_id: 'USER123', // Replace with actual user ID if available
+        session_id: sessionId,
         prompt: inputMessage,
-        models: activeModels,
+        models: Object.keys(selectedModels).filter((model) => selectedModels[model]),
       };
 
       console.log('Sending message:', messagePayload);
@@ -191,6 +93,12 @@ const MainLayout = () => {
     <div className="main-layout">
       <h1>Multi-LLM Platform</h1>
 
+      {/* Session Management */}
+      <div className="session-management">
+        <button onClick={handleStartSession}>Start Session</button>
+      </div>
+
+      {/* History Section */}
       <div className="history">
         <h4>History</h4>
         <ul>
@@ -202,6 +110,7 @@ const MainLayout = () => {
         </ul>
       </div>
 
+      {/* Main Content */}
       <div className="content">
         <div className="search-bar">
           <input
@@ -224,18 +133,6 @@ const MainLayout = () => {
               {model.toUpperCase()}
             </label>
           ))}
-        </div>
-
-        <div className="models">
-          {Object.keys(selectedModels).map(
-            (model) =>
-              selectedModels[model] && (
-                <div key={model} className="model-box">
-                  <h4>{model.toUpperCase()}</h4>
-                  <p>Output will appear here...</p>
-                </div>
-              )
-          )}
         </div>
       </div>
     </div>
