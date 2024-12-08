@@ -1,5 +1,6 @@
 import boto3
 import os
+import traceback
 
 def get_secret():
     region_name = "us-east-1"  # Change this to your AWS region
@@ -26,5 +27,6 @@ def get_secret():
         # else:
         #     raise ValueError("SecretBinary is not supported in this implementation.")
     except Exception as e:
-        print(f"Error retrieving secret {"LLM-Platform-Secrets"}: {e}")
+        print(traceback.format_exc())
+        print(f"Error retrieving secret LLM-Platform-Secrets: {e}")
         raise

@@ -5,6 +5,7 @@ import subprocess
 import redis
 from datetime import datetime
 from fastapi import HTTPException, BackgroundTasks, APIRouter
+import traceback
 
 from app.models.common_models import PromptRequest
 from app.helpers.get_secrets import get_secret
@@ -22,7 +23,7 @@ client = OpenAI(
 # Bastion host details
 BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
 BASTION_USER = "ec2-user"
-BASTION_KEY_PATH = "/Users/sumanthramesh/Documents/dev/cloud/jumper.pem"  # Path to the SSH private key
+BASTION_KEY_PATH = os.path.join(os.getcwd(), "jumper.pem")  # Path to the SSH private key
 
 # Configure Redis
 REDIS_HOST = "127.0.0.1"  # Localhost, forwarded by the SSH tunnel
@@ -75,7 +76,7 @@ async def generate_text(request: PromptRequest, ws_session_id: str, tasks: Backg
     """
     try:
         print("Ws Session ID: ", ws_session_id)
-        print("OPEN AI APY KEY: ", os.environ["OPENAI_API_KEY"])
+        # print("OPEN AI APY KEY: ", os.environ["OPENAI_API_KEY"])
 
         # Extract request details
         user_id = request.user_id
@@ -98,7 +99,6 @@ async def generate_text(request: PromptRequest, ws_session_id: str, tasks: Backg
             response_timestamp = datetime.now().isoformat()
             response_text = response.choices[0].message.content
         except Exception as e:
-            import traceback
             print(traceback.format_exc())
             raise HTTPException(status_code=500, detail=f"Error with OpenAI API: {str(e)}")
 
@@ -125,4 +125,5 @@ async def generate_text(request: PromptRequest, ws_session_id: str, tasks: Backg
             raise HTTPException(status_code=500, detail=f"Error with Redis operations: {str(e)}")
 
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
