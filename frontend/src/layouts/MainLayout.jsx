@@ -7,7 +7,7 @@ const MainLayout = () => {
   const { wsClient, isConnected, updateWebSocketUrl } = useWebSocket(); // Added `updateWebSocketUrl`
   const [selectedModels, setSelectedModels] = useState({
     "123": false,
-    model2: false,
+    "234": false,
     model3: false,
     model4: false,
   });
