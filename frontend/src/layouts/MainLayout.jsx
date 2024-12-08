@@ -151,13 +151,13 @@ const MainLayout = () => {
   const { wsClient, isConnected, updateWebSocketUrl } = useWebSocket();
   const [selectedModels, setSelectedModels] = useState({
     "123": false,
-    model2: false,
+    "234": false,
     model3: false,
     model4: false,
   });
   const [modelOutputs, setModelOutputs] = useState({
     "123": [],
-    model2: [],
+    "234": [],
     model3: [],
     model4: [],
   });
