@@ -167,10 +167,10 @@ const MainLayout = () => {
   useEffect(() => {
     if (wsClient && isConnected) {
       console.log('WebSocket is ready for communication');
-
+  
       wsClient.onMessage((data) => {
         let parsedData;
-
+  
         // Ensure correct parsing of WebSocket messages
         if (typeof data === 'string') {
           try {
@@ -182,9 +182,9 @@ const MainLayout = () => {
         } else {
           parsedData = data;
         }
-
+  
         console.log('Parsed Data:', parsedData);
-
+  
         const { model_id, response } = parsedData;
         if (model_id && response) {
           // Append the model's response to the chat history for the model
@@ -199,6 +199,7 @@ const MainLayout = () => {
       });
     }
   }, [wsClient, isConnected]);
+  
 
   const handleCheckboxChange = (model) => {
     setSelectedModels((prevState) => ({
@@ -211,12 +212,12 @@ const MainLayout = () => {
     const activeModels = Object.keys(selectedModels).filter(
       (model) => selectedModels[model]
     );
-
+  
     if (activeModels.length === 0) {
       console.error('No models selected');
       return;
     }
-
+  
     try {
       const sessionData = {
         model_ids: activeModels,
@@ -224,32 +225,33 @@ const MainLayout = () => {
         session_id: `session-${Date.now()}`,
         user_id: 'USER123',
       };
-
+  
       const response = await axios.post('http://127.0.0.1:8000/start-session', sessionData);
       console.log('Session started:', response.data);
-
+  
       setSessionId(response.data.ws_session_id);
       updateWebSocketUrl(`ws://127.0.0.1:8000/ws/${response.data.ws_session_id}`);
     } catch (error) {
       console.error('Error starting session:', error);
     }
   };
+  
 
   const sendMessage = () => {
     if (!sessionId) {
       console.error('No active session. Start a session first.');
       return;
     }
-
+  
     if (!inputMessage.trim()) {
       console.error('Input message is empty');
       return;
     }
-
+  
     const activeModels = Object.keys(selectedModels).filter(
       (model) => selectedModels[model]
     );
-
+  
     // Append the user's prompt to the chat history for each selected model
     activeModels.forEach((model) => {
       setModelOutputs((prev) => ({
@@ -257,7 +259,7 @@ const MainLayout = () => {
         [model]: [...prev[model], { sender: 'You', message: inputMessage }],
       }));
     });
-
+  
     if (isConnected && wsClient) {
       const messagePayload = {
         user_id: 'USER123',
@@ -265,7 +267,7 @@ const MainLayout = () => {
         prompt: inputMessage,
         models: activeModels,
       };
-
+  
       console.log('Sending message:', messagePayload);
       wsClient.sendMessage(messagePayload);
       setInputMessage('');
@@ -273,6 +275,7 @@ const MainLayout = () => {
       console.error('WebSocket is not connected');
     }
   };
+  
 
   return (
     <div className="main-layout">
@@ -310,27 +313,28 @@ const MainLayout = () => {
 
         {/* Model Panels */}
         <div className="models">
-          {Object.keys(modelOutputs).map((model) => (
-            <div key={model} className="model-box">
-              <h4>Model: {model.toUpperCase()}</h4>
-              <div className="chat-panel">
-                {modelOutputs[model].length > 0 ? (
-                  modelOutputs[model].map((msg, index) => (
-                    <p key={index}>
-                      <strong>{msg.sender}:</strong> {msg.message}
-                    </p>
-                  ))
-                ) : (
-                  <p>No chat history yet...</p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+  {Object.keys(modelOutputs).map((model) => (
+    <div key={model} className="model-box">
+      <h4>Model: {model.toUpperCase()}</h4>
+      <div className="chat-panel">
+        {modelOutputs[model].length > 0 ? (
+          modelOutputs[model].map((msg, index) => (
+            <p key={index}>
+              <strong>{msg.sender}:</strong> {msg.message}
+            </p>
+          ))
+        ) : (
+          <p>No chat history yet...</p>
+        )}
+      </div>
+    </div>
+  ))}
+</div>
       </div>
     </div>
   );
 };
 
 export default MainLayout;
+
 
