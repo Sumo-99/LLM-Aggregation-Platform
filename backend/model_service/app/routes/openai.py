@@ -7,12 +7,16 @@ from datetime import datetime
 from fastapi import HTTPException, BackgroundTasks, APIRouter
 
 from app.models.common_models import PromptRequest
+from app.helpers.get_secrets import get_secret
+
+cred_details = get_secret()
 
 router = APIRouter()
 
 # Configure OpenAI API client
+openai_api_key = cred_details["OPENAI_API_KEY"]
 client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY")
+    api_key=openai_api_key
 )
 
 # Bastion host details

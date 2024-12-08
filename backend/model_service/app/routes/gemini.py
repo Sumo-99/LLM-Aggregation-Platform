@@ -10,11 +10,15 @@ from fastapi import APIRouter
 from redis import Redis, ConnectionError
 
 from app.models.common_models import PromptRequest
+from app.helpers.get_secrets import get_secret
+
+cred_details = get_secret()
 
 router = APIRouter()
 
 # Configure Gemini API client
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+gemini_api_key = cred_details["GEMINI_API_KEY"]
+genai.configure(api_key=gemini_api_key)
 
 # Bastion host details
 BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
