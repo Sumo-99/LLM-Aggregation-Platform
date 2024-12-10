@@ -1,0 +1,15 @@
+.split-screen {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 10px;
+    height: calc(100vh - 100px); /* Adjust for search bar */
+  }
+  
+  .model-container {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+    overflow: auto;
+  }
+  
