@@ -275,6 +275,37 @@ const MainLayout = () => {
       console.error('WebSocket is not connected');
     }
   };
+
+  const handleStopSession = async () => {
+    if (!sessionId) {
+      console.error('No active session. Start a session first.');
+      return;
+    }
+  
+    try {
+      const response = await axios.post('http://127.0.0.1:8000/stop-session', {
+        session_id: sessionId,
+        user_id: 'USER123',
+      });
+      console.log('Session stopped:', response.data);
+  
+      // Reset session-related state
+      setSessionId(null);
+      setModelOutputs({
+        "123": [],
+        "234": [],
+        model3: [],
+        model4: [],
+      });
+  
+      if (wsClient) {
+        wsClient.closeConnection(); // Close the WebSocket connection
+      }
+    } catch (error) {
+      console.error('Error stopping session:', error);
+    }
+  };
+  
   
 
   return (
@@ -284,6 +315,7 @@ const MainLayout = () => {
       {/* Session Management */}
       <div className="session-management">
         <button onClick={handleStartSession}>Start Session</button>
+        <button onClick={handleStopSession} disabled={!sessionId}>Stop Session</button>
       </div>
 
       {/* Main Content */}
