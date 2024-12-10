@@ -9,3 +9,10 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+class ChatHistory(BaseModel):
+    user_id: str
+
+class ChatFlow(BaseModel):
+    chat_name: str
+    
