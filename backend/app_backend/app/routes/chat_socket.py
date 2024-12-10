@@ -39,7 +39,7 @@ model_table = dynamodb.Table('model')
 # Bastion host details
 BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
 BASTION_USER = "ec2-user"
-BASTION_KEY_PATH = "/Users/sumanthramesh/Documents/dev/cloud/jumper.pem"  # Path to the SSH private key
+BASTION_KEY_PATH = "/Users/swethajagadeesan/Documents/CloudComputing/Projecct/jumper.pem"  # Path to the SSH private key
 
 # Configure Redis
 REDIS_HOST = "127.0.0.1"  # Localhost, forwarded by the SSH tunnel
@@ -49,7 +49,7 @@ def create_redis_client():
     # Set up SSH tunnel (one-time setup)
     ssh_command = [
         "ssh",
-        "-i", "/Users/sumanthramesh/Documents/dev/cloud/jumper.pem",  # Path to your SSH key
+        "-i", "/Users/swethajagadeesan/Documents/CloudComputing/Projecct/jumper.pem",  # Path to your SSH key
         "-o", "StrictHostKeyChecking=no",
         "-L", "127.0.0.1:6378:127.0.0.1:6379",
         "ec2-user@3.230.206.206",
@@ -89,6 +89,10 @@ class WebSocketRequest(BaseModel):
     session_id: str
     user_id: str
 
+class StopSessionRequest(BaseModel):
+    session_id: str
+    user_id: str
+
 # In-memory store for active WebSocket connections
 class WebSocketManager:
     """Manages WebSocket connections."""
@@ -103,6 +107,8 @@ class WebSocketManager:
     def disconnect(self, session_id: str):
         """Remove a disconnected WebSocket connection."""
         if session_id in self.active_connections:
+            connection = self.active_connections[session_id]
+            asyncio.create_task(connection.close())
             del self.active_connections[session_id]
 
     async def send_message(self, session_id: str, message: str):
@@ -153,6 +159,24 @@ async def start_session(request: WebSocketRequest):
         "timestamp": timestamp,
         "ws_session_id": ws_session_id
     }
+
+@router.post("/stop-session")
+async def stop_session(request: StopSessionRequest):
+    """Stop the session by closing the WebSocket connection."""
+    session_id = request.session_id
+    ws_session_id = session_id if session_id.startswith("ws-") else f"ws-{session_id}"
+
+    try:
+        # Close the WebSocket connection
+        manager.disconnect(ws_session_id)
+
+        return {"message": "WebSocket session closed successfully"}
+    except Exception as e:
+        print(f"Error during WebSocket session closure: {e}")
+        raise HTTPException(status_code=500, detail=f"Error during WebSocket session closure: {str(e)}")
+
+
+
 
 @router.websocket("/ws/{ws_session_id}")
 @router.websocket("/ws/{ws_session_id}")
@@ -245,6 +269,7 @@ pubsub_client = create_pubsub_client()
 async def listen_to_redis(session_id: str, websocket: WebSocket):
     """Subscribe to Redis updates and send them to the WebSocket client asynchronously."""
     pubsub = pubsub_client.pubsub()
+    chat_history_table = dynamodb.Table("chat_history")
     try:
         pubsub.subscribe(session_id)
         print(f"Subscribed to Redis channel: {session_id}")
@@ -257,6 +282,32 @@ async def listen_to_redis(session_id: str, websocket: WebSocket):
                     data = message["data"]
                     print(f"Publishing to WebSocket: {data}")
                     await manager.send_message(session_id, data)
+
+                    # Storing in Dynamodb table - chat_history 
+                    try:
+                        raw_data = json.loads(data)
+                        if "model_id" in raw_data and "response" in raw_data:
+                            nested_prompt_data = json.loads(raw_data.get("prompt", "{}"))
+
+                            user_id = raw_data.get("user_id", "unknown_user")  # Default to avoid KeyError
+                            chat_id = f"{user_id}_{session_id}_{raw_data['model_id']}"
+                            chat_history_table.put_item(
+                                Item={
+                                    "user_id": nested_prompt_data.get("user_id", ""),
+                                    "session_id": session_id,
+                                    "model_id": raw_data["model_id"],
+                                    "created_at_timestamp": raw_data.get("timestamp", datetime.datetime.now().isoformat()),
+                                    "chat_id": chat_id,
+                                    "chat name": "Chat1",
+                                    "prompt": nested_prompt_data.get("prompt", ""),
+                                    "response": raw_data.get("response", ""),
+                                }
+                            )
+                            print(f"Stored chat data in DynamoDB: {raw_data}")
+                    except Exception as dynamo_error:
+                        print(f"Error storing data in DynamoDB: {dynamo_error}")
+            else:
+                print("No message received, continuing to wait...")
             await asyncio.sleep(0.1)  # Yield control to the event loop
     except asyncio.CancelledError:
         print(f"Redis listener cancelled for session: {session_id}")
