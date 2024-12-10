@@ -34,7 +34,7 @@ dynamodb = boto3.resource(
 model_table = dynamodb.Table('model')
 
 # Http Client
-http_client = httpx.AsyncClient()
+# http_client = httpx.AsyncClient()
 
 # Bastion host details
 BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
@@ -155,31 +155,63 @@ async def start_session(request: WebSocketRequest):
     }
 
 @router.websocket("/ws/{ws_session_id}")
+@router.websocket("/ws/{ws_session_id}")
 async def websocket_endpoint(websocket: WebSocket, ws_session_id: str):
     """WebSocket endpoint to handle the connection."""
     print("SEssion store --->", session_store)
+
     # Check if session exists
     if ws_session_id not in session_store:
         await websocket.close(code=4000, reason="Invalid session ID")
         return
 
-    # Connect the WebSocket
-    await manager.connect(ws_session_id, websocket)
-    all_model_data = session_store[ws_session_id]["all_model_data"]
+    # Create a new HTTP client for the session
+    http_client = httpx.AsyncClient()
+
+    # Track tasks for cleanup
+    tasks = set()
+
     try:
-        # Process incoming messages
-        asyncio.create_task(listen_to_redis(ws_session_id, websocket))
+        # Connect the WebSocket
+        await manager.connect(ws_session_id, websocket)
+        all_model_data = session_store[ws_session_id]["all_model_data"]
+
+        # Start listening to Redis
+        redis_task = asyncio.create_task(listen_to_redis(ws_session_id, websocket))
+        tasks.add(redis_task)
+
         while True:
             message = await websocket.receive_text()
             print(f"WebSocket message received: {message}")
-            asyncio.create_task(process_prompt(message, all_model_data, ws_session_id))
-    except WebSocketDisconnect:
-        manager.disconnect(ws_session_id)
-        print(f"WebSocket disconnected for session {ws_session_id}")
 
-async def process_prompt(message, all_model_data, ws_session_id):
+            # Create a new task for processing the prompt
+            task = asyncio.create_task(process_prompt(message, all_model_data, ws_session_id, http_client))
+            tasks.add(task)
+
+            # Remove completed tasks
+            tasks = {t for t in tasks if not t.done()}
+    except WebSocketDisconnect:
+        print(f"WebSocket disconnected for session {ws_session_id}")
+    finally:
+        # Cancel all pending tasks
+        for task in tasks:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        # Close the HTTP client
+        await http_client.aclose()
+
+        # Disconnect the WebSocket
+        manager.disconnect(ws_session_id)
+
+
+
+async def process_prompt(message, all_model_data, ws_session_id, http_client):
     """Trigger requests to model pods asynchronously."""
-    base_url = f"http://127.0.0.1:8080/"
+    base_url = f"http://127.0.0.1:8086/"
     for model_dict in all_model_data:
         print("Model Dict: ", model_dict)
         model_api_endpoint = settings.MODEL_API_MAP[model_dict["model_name"]]
@@ -190,15 +222,19 @@ async def process_prompt(message, all_model_data, ws_session_id):
             "model_id": model_dict["model_id"],
             "prompt": message
         }
-        asyncio.create_task(send_request(base_url, model_api_endpoint, payload, headers, ws_session_id))
+        # Create a new task for each request
+        await send_request(base_url, model_api_endpoint, payload, headers, ws_session_id, http_client)
 
-async def send_request(base_url, model_api_endpoint, payload, headers, ws_session_id):
-    """Send asynchronous HTTP request using the shared client."""
+
+
+async def send_request(base_url, model_api_endpoint, payload, headers, ws_session_id, http_client):
+    """Send asynchronous HTTP request using the client."""
     try:
         response = await http_client.post(f"{base_url}{model_api_endpoint}/{ws_session_id}", json=payload, headers=headers)
         print(f"Model trigger response: {response.text}")
     except Exception as e:
         print(f"Error triggering model: {e}")
+
 
 def create_pubsub_client():
     return redis.StrictRedis(host="127.0.0.1", port=6379, decode_responses=True)
@@ -221,12 +257,13 @@ async def listen_to_redis(session_id: str, websocket: WebSocket):
                     data = message["data"]
                     print(f"Publishing to WebSocket: {data}")
                     await manager.send_message(session_id, data)
-            else:
-                print("No message received, continuing to wait...")
             await asyncio.sleep(0.1)  # Yield control to the event loop
+    except asyncio.CancelledError:
+        print(f"Redis listener cancelled for session: {session_id}")
     except Exception as e:
         print(f"Error while listening to Redis: {e}")
     finally:
         print(f"Unsubscribing from Redis channel: {session_id}")
         pubsub.unsubscribe(session_id)
         pubsub.close()
+
