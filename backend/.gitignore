@@ -1,2 +1,8 @@
 model_service/jumper.pem
 model_service/app/**/__pycache__/
+custom_model_services/custom_models/*
+custom_model_services/venv-3.8/
+custom_model_services/venv-3.8/*
+.DS_Store
+backend/custom_model_services/.python-version
+backend/custom_model_services/playground.ipynb
