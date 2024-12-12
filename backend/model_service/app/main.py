@@ -11,6 +11,9 @@ download_pem_from_s3(BUCKET_NAME, S3_KEY, LOCAL_PATH)
 
 from app.routes import gemini
 from app.routes import openai
+from app.routes import llama
+from app.routes import claude
+
 
 app = FastAPI()
 
@@ -22,3 +25,5 @@ def read_root():
 app.include_router(test.router)
 app.include_router(gemini.router)
 app.include_router(openai.router)
+app.include_router(llama.router)
+app.include_router(claude.router)
