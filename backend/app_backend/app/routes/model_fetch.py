@@ -23,21 +23,38 @@ dynamodb = boto3.resource(
 model_table = dynamodb.Table('model')  # Replace with your model table name
 
 
-# Helper function to get models based on user_id and is_default
 def get_models(user_id: str) -> List[Dict]:
-    # Query the model table to fetch default models and models for a specific user_id
-    response = model_table.scan(
-        FilterExpression=Attr('is_default').eq(True) | (Attr('user_id').exists() & Attr('user_id').eq(user_id))
-    )
-    return response.get('Items', [])
+    try:
+        # Query the model table to fetch all default models
+        response_default = model_table.scan(
+            FilterExpression=Attr('is_default').eq(True)
+        )
+        default_models = response_default.get('Items', [])
+
+        # Query the model table to fetch models specific to the user
+        response_user = model_table.scan(
+            FilterExpression=Attr('user_id').eq(user_id)
+        )
+        user_models = response_user.get('Items', [])
+
+        # Combine default models and user models
+        models = default_models + user_models
+
+        # Extract only model_id and model_name
+        return [{"model_id": model["model_id"], "model_name": model["model_name"]} for model in models]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error querying models: {str(e)}")
+
+
+
 
 
 @router.get("/models")
 def fetch_models(user_id: str):
-    # Get the models from the model table
     try:
+        # Get the models from the model table
         models = get_models(user_id)
+        return {"models": models}
+    
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching models: {str(e)}")
-
-    return {"models": models}
