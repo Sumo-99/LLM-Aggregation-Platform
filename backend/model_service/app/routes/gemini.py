@@ -21,7 +21,7 @@ gemini_api_key = cred_details["GEMINI_API_KEY"]
 genai.configure(api_key=gemini_api_key)
 
 # Bastion host details
-BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
+BASTION_HOST = "34.229.219.213"  # Public IP of the bastion host
 BASTION_USER = "ec2-user"
 BASTION_KEY_PATH = os.path.join(os.getcwd(), "jumper.pem")  # Path to the SSH private key
 
@@ -36,7 +36,7 @@ def create_redis_client():
         "-i", BASTION_KEY_PATH,  # Path to your SSH key
         "-o", "StrictHostKeyChecking=no",
         "-L", "127.0.0.1:6379:127.0.0.1:6379",
-        "ec2-user@3.230.206.206",
+        "ec2-user@34.229.219.213",
         "-N"
     ]
 

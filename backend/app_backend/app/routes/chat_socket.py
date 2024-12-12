@@ -55,7 +55,7 @@ def create_redis_client():
         "-i", BASTION_KEY_PATH,  # Path to your SSH key
         "-o", "StrictHostKeyChecking=no",
         "-L", "127.0.0.1:6378:127.0.0.1:6379",
-        "ec2-user@3.230.206.206",
+        "ec2-user@34.229.219.213",
         "-N"
     ]
 
