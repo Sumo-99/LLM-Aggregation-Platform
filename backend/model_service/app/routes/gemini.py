@@ -20,8 +20,8 @@ router = APIRouter()
 gemini_api_key = cred_details["GEMINI_API_KEY"]
 genai.configure(api_key=gemini_api_key)
 
-# Bastion host details
-BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
+# Bastion host configuration
+BASTION_HOST = "34.229.219.213"  # Public IP of the bastion host
 BASTION_USER = "ec2-user"
 BASTION_KEY_PATH = os.path.join(os.getcwd(), "jumper.pem")  # Path to the SSH private key
 
@@ -30,13 +30,13 @@ REDIS_HOST = "127.0.0.1"  # Localhost, forwarded by the SSH tunnel
 REDIS_PORT = 6379
 
 def create_redis_client():
-    # Set up SSH tunnel (one-time setup)
+    """Set up the Redis client with SSH tunnel."""
     ssh_command = [
         "ssh",
         "-i", BASTION_KEY_PATH,  # Path to your SSH key
         "-o", "StrictHostKeyChecking=no",
         "-L", "127.0.0.1:6379:127.0.0.1:6379",
-        "ec2-user@3.230.206.206",
+        f"{BASTION_USER}@{BASTION_HOST}",
         "-N"
     ]
 
@@ -47,7 +47,7 @@ def create_redis_client():
         raise
 
     # Connect to Redis through the tunnel
-    return redis.StrictRedis(host="127.0.0.1", port=6379, decode_responses=True)
+    return redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
 # Initialize Redis client
 redis_client = create_redis_client()

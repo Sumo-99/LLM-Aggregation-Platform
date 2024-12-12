@@ -20,8 +20,8 @@ client = OpenAI(
     api_key=openai_api_key
 )
 
-# Bastion host details
-BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
+# Bastion host configuration
+BASTION_HOST = "34.229.219.213"  # Public IP of the bastion host
 BASTION_USER = "ec2-user"
 BASTION_KEY_PATH = os.path.join(os.getcwd(), "jumper.pem")  # Path to the SSH private key
 

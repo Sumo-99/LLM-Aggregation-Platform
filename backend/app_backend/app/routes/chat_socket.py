@@ -37,9 +37,9 @@ model_table = dynamodb.Table('model')
 # http_client = httpx.AsyncClient()
 
 # Bastion host details
-BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
+BASTION_HOST = "34.229.219.213"  # Public IP of the bastion host
 BASTION_USER = "ec2-user"
-BASTION_KEY_PATH = "/Users/swethajagadeesan/Documents/CloudComputing/Projecct/jumper.pem"  # Path to the SSH private key
+BASTION_KEY_PATH = "/Users/sumanthramesh/Documents/dev/cloud/jumper.pem"  # Path to the SSH private key
 
 # Configure Redis
 REDIS_HOST = "127.0.0.1"  # Localhost, forwarded by the SSH tunnel
@@ -49,7 +49,7 @@ def create_redis_client():
     # Set up SSH tunnel (one-time setup)
     ssh_command = [
         "ssh",
-        "-i", "/Users/swethajagadeesan/Documents/CloudComputing/Projecct/jumper.pem",  # Path to your SSH key
+        "-i", "BASTION_KEY_PATH",  # Path to your SSH key
         "-o", "StrictHostKeyChecking=no",
         "-L", "127.0.0.1:6378:127.0.0.1:6379",
         "ec2-user@3.230.206.206",
