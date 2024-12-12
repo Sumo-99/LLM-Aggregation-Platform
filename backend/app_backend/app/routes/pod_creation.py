@@ -135,7 +135,7 @@ def download_pem_from_s3(bucket_name, s3_key, local_path):
     region_name = os.getenv("AWS_REGION", "us-east-1")
     aws_access_key_id = ""
     aws_secret_access_key = ""
-    # Create S3 client
+    # Create S3 clients
     s3_client = boto3.client(
         "s3",
         aws_access_key_id=aws_access_key_id,
