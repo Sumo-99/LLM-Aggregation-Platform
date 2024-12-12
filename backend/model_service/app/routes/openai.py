@@ -9,6 +9,7 @@ import traceback
 
 from app.models.common_models import PromptRequest
 from app.helpers.get_secrets import get_secret
+from app.helpers.get_pem import download_pem_from_s3
 
 cred_details = get_secret()
 
@@ -20,12 +21,12 @@ client = OpenAI(
     api_key=openai_api_key
 )
 
-# Bastion host configuration
-BASTION_HOST = "34.229.219.213"  # Public IP of the bastion host
-BASTION_USER = "ec2-user"
-BASTION_KEY_PATH = os.path.join(os.getcwd(), "jumper.pem")  # Path to the SSH private key
 
 # Configure Redis
+BASTION_HOST = "34.229.219.213"  # Public IP of the bastion host
+BASTION_USER = "ec2-user"
+LOCAL_PATH = os.path.join(os.getcwd(), "jumper.pem")  # Relative path for the PEM file
+BASTION_KEY_PATH = LOCAL_PATH
 REDIS_HOST = "127.0.0.1"  # Localhost, forwarded by the SSH tunnel
 REDIS_PORT = 6379
 

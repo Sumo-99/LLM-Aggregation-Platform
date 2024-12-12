@@ -14,6 +14,9 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict
 from app.config import settings
+from app.helpers.get_pem import download_pem_from_s3
+
+LOCAL_PATH = os.path.join(os.getcwd(), "jumper.pem")  # Relative path for the PEM file
 
 # Initialize APIRouter
 router = APIRouter()
@@ -39,7 +42,7 @@ model_table = dynamodb.Table('model')
 # Bastion host details
 BASTION_HOST = "34.229.219.213"  # Public IP of the bastion host
 BASTION_USER = "ec2-user"
-BASTION_KEY_PATH = "/Users/sumanthramesh/Documents/dev/cloud/jumper.pem"  # Path to the SSH private key
+BASTION_KEY_PATH = LOCAL_PATH  # Path to the SSH private key
 
 # Configure Redis
 REDIS_HOST = "127.0.0.1"  # Localhost, forwarded by the SSH tunnel
@@ -49,7 +52,7 @@ def create_redis_client():
     # Set up SSH tunnel (one-time setup)
     ssh_command = [
         "ssh",
-        "-i", "BASTION_KEY_PATH",  # Path to your SSH key
+        "-i", BASTION_KEY_PATH,  # Path to your SSH key
         "-o", "StrictHostKeyChecking=no",
         "-L", "127.0.0.1:6378:127.0.0.1:6379",
         "ec2-user@3.230.206.206",
@@ -235,7 +238,7 @@ async def websocket_endpoint(websocket: WebSocket, ws_session_id: str):
 
 async def process_prompt(message, all_model_data, ws_session_id, http_client):
     """Trigger requests to model pods asynchronously."""
-    base_url = f"http://127.0.0.1:8086/"
+    base_url = f"http://127.0.0.1:8081/"
     for model_dict in all_model_data:
         print("Model Dict: ", model_dict)
         model_api_endpoint = settings.MODEL_API_MAP[model_dict["model_name"]]
