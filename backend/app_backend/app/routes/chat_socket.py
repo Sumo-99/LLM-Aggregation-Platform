@@ -40,7 +40,7 @@ model_table = dynamodb.Table('model')
 # http_client = httpx.AsyncClient()
 
 # Bastion host details
-BASTION_HOST = "3.230.206.206"  # Public IP of the bastion host
+BASTION_HOST = "34.229.219.213"  # Public IP of the bastion host
 BASTION_USER = "ec2-user"
 BASTION_KEY_PATH = LOCAL_PATH  # Path to the SSH private key
 
