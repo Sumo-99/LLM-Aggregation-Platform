@@ -238,7 +238,7 @@ async def websocket_endpoint(websocket: WebSocket, ws_session_id: str):
 
 async def process_prompt(message, all_model_data, ws_session_id, http_client):
     """Trigger requests to model pods asynchronously."""
-    base_url = f"http://127.0.0.1:8081/"
+    base_url = f"http://127.0.0.1:8080/"
     for model_dict in all_model_data:
         print("Model Dict: ", model_dict)
         model_api_endpoint = settings.MODEL_API_MAP[model_dict["model_name"]]
