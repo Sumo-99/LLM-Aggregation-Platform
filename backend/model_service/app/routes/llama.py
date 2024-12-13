@@ -67,20 +67,15 @@ redis_ping()
 async def generate_text(request: PromptRequest, ws_session_id: str):
     """
     Generate a response using the Llama API with function calls.
-
-    :param request: The request containing user_id, session_id, model_id, and prompt.
-    :param ws_session_id: The WebSocket session ID.
-    :return: The response content from LlamaAPI.
     """
     try:
-        # Extract request details
         user_id = request.user_id
         sess_id = request.session_id
         model_id = request.model_id
         prompt = request.prompt
         prompt_timestamp = datetime.now().isoformat()
 
-        # Build the API request for LlamaAPI
+        # Construct the API request
         api_request_json = {
             "model": "llama3.1-70b",
             "messages": [
@@ -89,29 +84,42 @@ async def generate_text(request: PromptRequest, ws_session_id: str):
             "stream": False,
         }
 
-        # Execute the API request
         try:
+            # Send the request to LlamaAPI
             response = client.run(api_request_json)
             response_data = response.json()
+
+            # Extract the response content
+            response_content = response_data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+            if not response_content:
+                raise ValueError("Empty response from LlamaAPI")
             
-            # Extract only the response content
-            response_content = response_data["choices"][0]["message"]["content"].strip()
             response_timestamp = datetime.now().isoformat()
         except Exception as e:
             print(traceback.format_exc())
             raise HTTPException(status_code=500, detail=f"Error with Llama API: {str(e)}")
 
-        # Build and return the response
-        return {
-            "ws_session_id": ws_session_id,
-            "user_id": user_id,
-            "session_id": sess_id,
-            "model_id": model_id,
+        # Store and return the response
+        redis_key = f"{user_id}_{sess_id}_{model_id}"
+        new_entry = {
             "prompt": prompt,
+            "response": response_content,
             "prompt_timestamp": prompt_timestamp,
-            "response": response_content,  # Only include the response content
             "response_timestamp": response_timestamp,
+            "model_id": model_id,
         }
+
+        try:
+            # Push to Redis and publish
+            redis_client.rpush(redis_key, json.dumps(new_entry))
+            redis_client.publish(ws_session_id, json.dumps(new_entry))
+            return {
+                "redis_key": redis_key,
+                "published_channel": ws_session_id,
+                "data_stored": new_entry,
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error with Redis operations: {str(e)}")
 
     except Exception as e:
         print(traceback.format_exc())

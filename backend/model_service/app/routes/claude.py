@@ -89,7 +89,6 @@ async def generate_text(request: PromptRequest, ws_session_id: str):
                 max_tokens=1024,
                 messages=messages
             )
-            print(response)
             response_content = response.content[0].text.strip()
             response_timestamp = datetime.now().isoformat()
         except Exception as e:
