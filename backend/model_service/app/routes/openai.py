@@ -99,6 +99,21 @@ async def generate_text(request: PromptRequest, ws_session_id: str, tasks: Backg
             )
             response_timestamp = datetime.now().isoformat()
             response_text = response.choices[0].message.content
+            try:
+        # Check if the response is JSON
+                parsed_response = json.loads(response_text)
+                if isinstance(parsed_response, dict) and "response" in parsed_response:
+                    response_text = parsed_response["response"]
+                else:
+                    # Fallback if JSON doesn't have the expected structure
+                    response_text = response_text.strip()
+            except json.JSONDecodeError:
+                # If response is not JSON, treat it as a plain string
+                response_text = response_text.strip()
+
+            # Ensure there is a valid response
+            if not response_text:
+                response_text = "I'm sorry, I couldn't generate a proper response. Could you please rephrase or provide more details?"
         except Exception as e:
             print(traceback.format_exc())
             raise HTTPException(status_code=500, detail=f"Error with OpenAI API: {str(e)}")

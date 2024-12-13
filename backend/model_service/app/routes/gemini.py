@@ -72,10 +72,18 @@ async def generate_text(request: PromptRequest, ws_session_id: str, tasks: Backg
         user_id = request.user_id
         sess_id = request.session_id
         model_id = request.model_id
+        
         prompt = request.prompt
+
         prompt_timestamp = datetime.now().isoformat()
         response = model.generate_content(request.prompt)
         response_text = response.text.strip()
+        if "JSON" in response_text:
+            response_text = "How do you do?"
+
+# Handle empty or malformed responses
+        if not response_text:
+            response_text = "I'm sorry, I couldn't generate a proper response. Could you please rephrase or provide more details?"
         response_timestamp = datetime.now().isoformat()
 
         # TODO:

@@ -89,8 +89,25 @@ async def generate_text(request: PromptRequest, ws_session_id: str):
                 max_tokens=1024,
                 messages=messages
             )
+
             response_content = response.content[0].text.strip()
             response_timestamp = datetime.now().isoformat()
+            try:
+                # If the response is JSON-like, parse it
+                parsed_response = json.loads(response_content)
+                if isinstance(parsed_response, dict):
+                # Check for common keys and extract response
+                    if "content" in parsed_response:
+                        response_content = parsed_response["content"]
+                    elif "text" in parsed_response:  # Handle cases where "text" is used
+                        response_content = parsed_response["text"]
+                    elif "response" in parsed_response:
+                        response_content = parsed_response["response"]
+            except json.JSONDecodeError:
+                            # If it's not JSON, leave it as plain text
+                pass
+
+            
         except Exception as e:
             print(traceback.format_exc())
             raise HTTPException(status_code=500, detail=f"Error with Claude API: {str(e)}")
