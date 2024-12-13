@@ -55,7 +55,7 @@ def get_chat_flow(request: ChatFlow):
 
     # Process messages to interleave by timestamp
     messages = sorted(messages_response['Items'], key=lambda x: x['created_at_timestamp'])
-    models = {"gemini": [], "gpt": []}  # Predefined model categories (adjust if dynamic)
+    models = {"gemini": [], "gpt": [], "claude": [], "llama": []}  # Predefined model categories (adjust if dynamic)
 
     for message in messages:
         model_name = message['sender']
